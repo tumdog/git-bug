@@ -9,7 +9,7 @@ install:
 	go install -tags=deploy_build .
 
 test: build
-	go test ./...
+	go test -v ./...
 
 webui:
 	npm run --prefix webui build

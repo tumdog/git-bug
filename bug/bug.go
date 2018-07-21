@@ -3,6 +3,7 @@ package bug
 import (
 	"errors"
 	"fmt"
+	"github.com/MichaelMure/git-bug/bug/clock"
 	"github.com/MichaelMure/git-bug/repository"
 	"github.com/MichaelMure/git-bug/util"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 const BugsRefPattern = "refs/bugs/"
 const BugsRemoteRefPattern = "refs/remote/%s/bugs/"
+
 const OpsEntryName = "ops"
 const RootEntryName = "root"
 
@@ -17,26 +19,41 @@ const IdLength = 40
 const HumanIdLength = 7
 
 // Bug hold the data of a bug thread, organized in a way close to
-// how it will be persisted inside Git. This is the datastructure
+// how it will be persisted inside Git. This is the data structure
 // used for merge of two different version.
 type Bug struct {
+
+	// A Lamport clock is a logical clock that allow to order event
+	// inside a distributed system.
+	// It must be the first field in this struct due to https://github.com/golang/go/issues/599
+	clock clock.LamportTime
+
 	// Id used as unique identifier
 	id string
 
 	lastCommit util.Hash
 	rootPack   util.Hash
 
-	// TODO: need a way to order bugs, probably a Lamport clock
-
+	// all the commited operations
 	packs []OperationPack
 
+	// a temporary pack of operations used for convenience to pile up new operations
+	// before a commit
 	staging OperationPack
 }
 
 // Create a new Bug
 func NewBug() *Bug {
 	// No id yet
-	return &Bug{}
+	return &Bug{
+		// Equivalent to:
+		//
+		// clock = clock.BugClock.Time()
+		// clock.BugClock.Increment()
+		//
+		// ... but thread safe
+		clock: clock.BugClock.Increment() - 1,
+	}
 }
 
 // Find an existing Bug matching a prefix
@@ -193,6 +210,7 @@ func (bug *Bug) IsValid() bool {
 	return true
 }
 
+// Append an operation into the staging area, to be commited later
 func (bug *Bug) Append(op Operation) {
 	bug.staging.Append(op)
 }
